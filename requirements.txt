@@ -1,0 +1,21 @@
+# Telegram Bot
+python-telegram-bot==21.9
+
+# Web server for OAuth callbacks
+flask==3.1.0
+
+# HTTP client
+requests==2.32.3
+
+# Environment variables
+python-dotenv==1.0.1
+
+# Task scheduling (morning summaries)
+APScheduler==3.10.4
+
+# Claude Vision for nutrition
+anthropic==0.45.0
+
+# Async HTTP (used by python-telegram-bot internally)
+aiohttp==3.11.11
+aiofiles==24.1.0
