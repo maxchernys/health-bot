@@ -128,3 +128,12 @@ def ask_health_assistant(question: str) -> str:
     except Exception as e:
         logger.exception("[Assistant] Error")
         return f"Ошибка при обработке вопроса: {e}"
+
+
+def morning_briefing() -> str:
+    """Generate a morning health briefing via Claude."""
+    return ask_health_assistant(
+        "Дай утренний брифинг. Кратко расскажи как я спал, как восстановился, "
+        "и что лучше делать сегодня — тренироваться или отдыхать. "
+        "Если есть что-то необычное в данных — обрати внимание."
+    )

@@ -38,5 +38,5 @@ DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "./data/health.db"))
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 # --- Scheduler ---
-MORNING_SUMMARY_HOUR = 8
+MORNING_SUMMARY_HOUR = 6
 MORNING_SUMMARY_MINUTE = 0
