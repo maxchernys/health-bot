@@ -7,6 +7,7 @@ import anthropic
 
 import config
 from aggregator.aggregator import aggregate
+from database.db import db
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,10 @@ How to use the data:
 - Always ground your answers in actual numbers. Don't give generic advice.
 - If HRV is low on both devices — say it clearly and explain what it means for today.
 - If temperature is elevated — flag it as a potential early warning sign.
-- Compare today's metrics to the user's personal baseline, not population averages.
+- Compare today's metrics to the user's personal baseline from the 7-day history provided. Use the history to spot trends.
 - Consider the relationship between yesterday's strain and today's recovery when giving recommendations.
+- If HRV or recovery is trending down over 3+ days — flag it as a concern.
+- If temperature deviation is growing — warn about possible illness.
 
 What you can do:
 - Give a morning briefing when asked or on schedule
@@ -50,6 +53,54 @@ Rules:
 - Ask clarifying questions about the user's context when relevant — don't assume
 - If asked something outside health/training/recovery — politely redirect back to your purpose
 - If data is missing (None/—) — don't make it up, say the data is unavailable"""
+
+
+def _get_history(days: int = 7) -> str:
+    """Fetch last N days of metrics from DB for trend analysis."""
+    lines = []
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT d.date,
+                   d.composite_recovery, d.training_readiness,
+                   w.recovery_score, w.hrv_rmssd, w.rhr, w.sleep_duration_min,
+                   w.sleep_efficiency, w.workout_strain,
+                   o.readiness_score, o.sleep_score, o.activity_score,
+                   o.stress_high, o.temperature_deviation
+            FROM daily_scores d
+            LEFT JOIN whoop_metrics w ON w.date = d.date
+            LEFT JOIN oura_metrics o ON o.date = d.date
+            WHERE d.date < date('now')
+            ORDER BY d.date DESC
+            LIMIT ?
+            """,
+            (days,),
+        ).fetchall()
+
+    if not rows:
+        return ""
+
+    lines.append(f"\n--- History (last {len(rows)} days) ---")
+    for r in rows:
+        hrv = f"{r['hrv_rmssd']:.0f}" if r["hrv_rmssd"] else "—"
+        rhr = f"{r['rhr']:.0f}" if r["rhr"] else "—"
+        sleep = ""
+        if r["sleep_duration_min"]:
+            h, m = divmod(int(r["sleep_duration_min"]), 60)
+            sleep = f"{h}h{m}m"
+        else:
+            sleep = "—"
+        strain = f"{r['workout_strain']:.1f}" if r["workout_strain"] else "—"
+        stress = f"{r['stress_high']:.1f}h" if r["stress_high"] else "—"
+        temp = f"{r['temperature_deviation']:+.2f}" if r["temperature_deviation"] is not None else "—"
+
+        lines.append(
+            f"  {r['date']}: recovery={r['composite_recovery'] or '—'}, "
+            f"HRV={hrv}, RHR={rhr}, sleep={sleep}, "
+            f"strain={strain}, stress={stress}, temp_dev={temp}"
+        )
+
+    return "\n".join(lines)
 
 
 def _build_health_context(data: dict) -> str:
@@ -107,6 +158,11 @@ def _build_health_context(data: dict) -> str:
         lines.append("\n⚠️ Partial data:")
         for err in errors:
             lines.append(f"  - {err}")
+
+    # Add 7-day history for trend analysis
+    history = _get_history(7)
+    if history:
+        lines.append(history)
 
     return "\n".join(lines)
 
