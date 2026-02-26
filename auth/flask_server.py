@@ -12,8 +12,24 @@ from database.db import db
 
 logger = logging.getLogger(__name__)
 
-# In-memory state store {state: provider}
-_pending_states: dict[str, str] = {}
+def _save_state(state: str, provider: str) -> None:
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO oauth_states (state, provider) VALUES (?, ?)",
+            (state, provider),
+        )
+
+
+def _pop_state(state: str) -> str | None:
+    """Return provider for the given state and delete it. Returns None if not found."""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT provider FROM oauth_states WHERE state = ?", (state,)
+        ).fetchone()
+        if row:
+            conn.execute("DELETE FROM oauth_states WHERE state = ?", (state,))
+            return row["provider"]
+    return None
 
 
 def _save_token(provider: str, token_data: dict) -> None:
@@ -42,7 +58,7 @@ def _save_token(provider: str, token_data: dict) -> None:
 def get_auth_url(provider: str) -> str:
     """Return the OAuth2 authorization URL for the given provider."""
     state = secrets.token_urlsafe(16)
-    _pending_states[state] = provider
+    _save_state(state, provider)
 
     if provider == "whoop":
         params = {
@@ -176,7 +192,7 @@ def create_flask_app() -> Flask:
             logger.error("[Auth] Whoop OAuth error: %s", error)
             return f"<h2>Whoop auth error: {error}</h2>", 400
 
-        if _pending_states.pop(state, None) != "whoop":
+        if _pop_state(state) != "whoop":
             return "<h2>Invalid state</h2>", 400
 
         try:
@@ -197,7 +213,7 @@ def create_flask_app() -> Flask:
             logger.error("[Auth] Oura OAuth error: %s", error)
             return f"<h2>Oura auth error: {error}</h2>", 400
 
-        if _pending_states.pop(state, None) != "oura":
+        if _pop_state(state) != "oura":
             return "<h2>Invalid state</h2>", 400
 
         try:

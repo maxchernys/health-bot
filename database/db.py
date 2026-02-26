@@ -75,6 +75,13 @@ def init_db() -> None:
                 UNIQUE(date)
             );
 
+            -- OAuth state tokens (for CSRF protection)
+            CREATE TABLE IF NOT EXISTS oauth_states (
+                state       TEXT PRIMARY KEY,
+                provider    TEXT NOT NULL,
+                created_at  INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+
             -- Composite daily scores
             CREATE TABLE IF NOT EXISTS daily_scores (
                 id                      INTEGER PRIMARY KEY AUTOINCREMENT,
