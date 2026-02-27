@@ -18,11 +18,12 @@ class WhoopAuthError(Exception):
 
 
 class WhoopClient:
-    def __init__(self):
+    def __init__(self, chat_id: int):
         self.base = config.WHOOP_API_BASE
+        self.chat_id = chat_id
 
     def _headers(self) -> dict[str, str]:
-        token = get_valid_token("whoop")
+        token = get_valid_token(self.chat_id, "whoop")
         if not token:
             raise WhoopAuthError("No valid Whoop token. Run /connect_whoop first.")
         return {"Authorization": f"Bearer {token}"}

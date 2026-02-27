@@ -1,4 +1,4 @@
-"""APScheduler — scheduled messages to Telegram."""
+"""APScheduler — scheduled messages to Telegram for all users."""
 from __future__ import annotations
 
 import asyncio
@@ -10,43 +10,46 @@ from telegram import Bot
 
 import config
 from bot.assistant import morning_briefing, evening_summary
+from database.db import get_all_users
 
 logger = logging.getLogger(__name__)
 
 
-def _send_telegram(text: str) -> None:
-    """Send a plain-text message to the configured Telegram chat."""
+def _send_telegram(chat_id: int, text: str) -> None:
+    """Send a plain-text message to a specific Telegram chat."""
     async def _send():
         bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-        await bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=text)
+        await bot.send_message(chat_id=chat_id, text=text)
     asyncio.run(_send())
 
 
 def _job_morning_briefing() -> None:
-    logger.info("[Scheduler] Generating morning briefing…")
-    try:
-        _send_telegram(morning_briefing())
-        logger.info("[Scheduler] Morning briefing sent.")
-    except Exception:
-        logger.exception("[Scheduler] Failed to send morning briefing")
+    logger.info("[Scheduler] Generating morning briefings…")
+    for chat_id in get_all_users():
+        try:
+            _send_telegram(chat_id, morning_briefing(chat_id))
+            logger.info("[Scheduler] Morning briefing sent to %s", chat_id)
+        except Exception:
+            logger.exception("[Scheduler] Failed morning briefing for %s", chat_id)
 
 
 def _job_evening_reminder() -> None:
-    logger.info("[Scheduler] Sending magnesium reminder…")
-    try:
-        _send_telegram("💊 Не забудь выпить магний!")
-        logger.info("[Scheduler] Magnesium reminder sent.")
-    except Exception:
-        logger.exception("[Scheduler] Failed to send magnesium reminder")
+    logger.info("[Scheduler] Sending magnesium reminders…")
+    for chat_id in get_all_users():
+        try:
+            _send_telegram(chat_id, "💊 Не забудь выпить магний!")
+        except Exception:
+            logger.exception("[Scheduler] Failed reminder for %s", chat_id)
 
 
 def _job_evening_summary() -> None:
-    logger.info("[Scheduler] Generating evening summary…")
-    try:
-        _send_telegram(evening_summary())
-        logger.info("[Scheduler] Evening summary sent.")
-    except Exception:
-        logger.exception("[Scheduler] Failed to send evening summary")
+    logger.info("[Scheduler] Generating evening summaries…")
+    for chat_id in get_all_users():
+        try:
+            _send_telegram(chat_id, evening_summary(chat_id))
+            logger.info("[Scheduler] Evening summary sent to %s", chat_id)
+        except Exception:
+            logger.exception("[Scheduler] Failed evening summary for %s", chat_id)
 
 
 def start_scheduler() -> BackgroundScheduler:

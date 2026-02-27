@@ -6,7 +6,6 @@ load_dotenv(override=True)
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN: str = os.environ["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID: int = int(os.environ["TELEGRAM_CHAT_ID"])
 
 # --- Whoop ---
 WHOOP_CLIENT_ID: str = os.environ["WHOOP_CLIENT_ID"]

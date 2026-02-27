@@ -28,18 +28,35 @@ def init_db() -> None:
     """Create all tables if they don't exist."""
     with db() as conn:
         conn.executescript("""
-            -- OAuth tokens storage
+            -- Registered users
+            CREATE TABLE IF NOT EXISTS users (
+                chat_id     INTEGER PRIMARY KEY,
+                created_at  INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+
+            -- OAuth tokens storage (per user)
             CREATE TABLE IF NOT EXISTS oauth_tokens (
-                provider    TEXT PRIMARY KEY,
+                chat_id       INTEGER NOT NULL,
+                provider      TEXT NOT NULL,
                 access_token  TEXT NOT NULL,
                 refresh_token TEXT,
                 expires_at    INTEGER,
-                updated_at    INTEGER DEFAULT (strftime('%s', 'now'))
+                updated_at    INTEGER DEFAULT (strftime('%s', 'now')),
+                PRIMARY KEY (chat_id, provider)
             );
 
-            -- Whoop daily snapshots
+            -- OAuth state tokens (for CSRF protection)
+            CREATE TABLE IF NOT EXISTS oauth_states (
+                state       TEXT PRIMARY KEY,
+                provider    TEXT NOT NULL,
+                chat_id     INTEGER NOT NULL,
+                created_at  INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+
+            -- Whoop daily snapshots (per user)
             CREATE TABLE IF NOT EXISTS whoop_metrics (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id         INTEGER NOT NULL,
                 date            TEXT NOT NULL,
                 recovery_score  REAL,
                 hrv_rmssd       REAL,
@@ -52,12 +69,13 @@ def init_db() -> None:
                 workout_strain  REAL,
                 raw_json        TEXT,
                 created_at      INTEGER DEFAULT (strftime('%s', 'now')),
-                UNIQUE(date)
+                UNIQUE(chat_id, date)
             );
 
-            -- Oura daily snapshots
+            -- Oura daily snapshots (per user)
             CREATE TABLE IF NOT EXISTS oura_metrics (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id         INTEGER NOT NULL,
                 date            TEXT NOT NULL,
                 readiness_score INTEGER,
                 readiness_contributors TEXT,
@@ -72,27 +90,37 @@ def init_db() -> None:
                 temperature_trend_deviation REAL,
                 raw_json        TEXT,
                 created_at      INTEGER DEFAULT (strftime('%s', 'now')),
-                UNIQUE(date)
+                UNIQUE(chat_id, date)
             );
 
-            -- OAuth state tokens (for CSRF protection)
-            CREATE TABLE IF NOT EXISTS oauth_states (
-                state       TEXT PRIMARY KEY,
-                provider    TEXT NOT NULL,
-                created_at  INTEGER DEFAULT (strftime('%s', 'now'))
-            );
-
-            -- Composite daily scores
+            -- Composite daily scores (per user)
             CREATE TABLE IF NOT EXISTS daily_scores (
                 id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-                date                    TEXT NOT NULL UNIQUE,
+                chat_id                 INTEGER NOT NULL,
+                date                    TEXT NOT NULL,
                 composite_recovery      REAL,
                 training_readiness      REAL,
                 whoop_weight            REAL DEFAULT 0.5,
                 oura_weight             REAL DEFAULT 0.5,
                 notes                   TEXT,
-                created_at              INTEGER DEFAULT (strftime('%s', 'now'))
+                created_at              INTEGER DEFAULT (strftime('%s', 'now')),
+                UNIQUE(chat_id, date)
             );
 
         """)
     print(f"[DB] Initialized at {DATABASE_PATH}")
+
+
+def ensure_user(chat_id: int) -> None:
+    """Register user if not already in the database."""
+    with db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO users (chat_id) VALUES (?)", (chat_id,)
+        )
+
+
+def get_all_users() -> list[int]:
+    """Return list of all registered chat_ids."""
+    with db() as conn:
+        rows = conn.execute("SELECT chat_id FROM users").fetchall()
+    return [r["chat_id"] for r in rows]

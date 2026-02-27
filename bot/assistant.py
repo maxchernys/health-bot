@@ -55,7 +55,7 @@ Rules:
 - If data is missing (None/—) — don't make it up, say the data is unavailable"""
 
 
-def _get_history(days: int = 7) -> str:
+def _get_history(chat_id: int, days: int = 7) -> str:
     """Fetch last N days of metrics from DB for trend analysis."""
     lines = []
     with db() as conn:
@@ -68,13 +68,13 @@ def _get_history(days: int = 7) -> str:
                    o.readiness_score, o.sleep_score, o.activity_score,
                    o.stress_high, o.temperature_deviation
             FROM daily_scores d
-            LEFT JOIN whoop_metrics w ON w.date = d.date
-            LEFT JOIN oura_metrics o ON o.date = d.date
-            WHERE d.date < date('now')
+            LEFT JOIN whoop_metrics w ON w.chat_id = d.chat_id AND w.date = d.date
+            LEFT JOIN oura_metrics o ON o.chat_id = d.chat_id AND o.date = d.date
+            WHERE d.chat_id = ? AND d.date < date('now')
             ORDER BY d.date DESC
             LIMIT ?
             """,
-            (days,),
+            (chat_id, days),
         ).fetchall()
 
     if not rows:
@@ -159,19 +159,23 @@ def _build_health_context(data: dict) -> str:
         for err in errors:
             lines.append(f"  - {err}")
 
-    # Add 7-day history for trend analysis
-    history = _get_history(7)
-    if history:
-        lines.append(history)
-
     return "\n".join(lines)
 
 
-def ask_health_assistant(question: str) -> str:
+def _build_health_context_with_history(chat_id: int, data: dict) -> str:
+    """Build health context including 7-day history."""
+    context = _build_health_context(data)
+    history = _get_history(chat_id, 7)
+    if history:
+        context += "\n" + history
+    return context
+
+
+def ask_health_assistant(chat_id: int, question: str) -> str:
     """Fetch current health data and answer user's question with Claude."""
     try:
-        data = aggregate()
-        context = _build_health_context(data)
+        data = aggregate(chat_id)
+        context = _build_health_context_with_history(chat_id, data)
         system = SYSTEM_PROMPT.format(health_context=context)
 
         message = _client.messages.create(
@@ -186,19 +190,21 @@ def ask_health_assistant(question: str) -> str:
         return f"Ошибка при обработке вопроса: {e}"
 
 
-def morning_briefing() -> str:
+def morning_briefing(chat_id: int) -> str:
     """Generate a morning health briefing via Claude."""
     return ask_health_assistant(
+        chat_id,
         "Дай утренний брифинг. Кратко расскажи как я спал, как восстановился, "
         "и что лучше делать сегодня — тренироваться или отдыхать. "
-        "Если есть что-то необычное в данных — обрати внимание."
+        "Если есть что-то необычное в данных — обрати внимание.",
     )
 
 
-def evening_summary() -> str:
+def evening_summary(chat_id: int) -> str:
     """Generate an evening day summary via Claude."""
     return ask_health_assistant(
+        chat_id,
         "Дай вечернее саммари за день. Расскажи как прошёл день по данным: "
         "сколько шагов, какой был strain/нагрузка, уровень стресса, активность. "
-        "Дай рекомендацию на вечер — когда лучше лечь спать для хорошего восстановления."
+        "Дай рекомендацию на вечер — когда лучше лечь спать для хорошего восстановления.",
     )

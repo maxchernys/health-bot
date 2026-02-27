@@ -18,11 +18,12 @@ class OuraAuthError(Exception):
 
 
 class OuraClient:
-    def __init__(self):
+    def __init__(self, chat_id: int):
         self.base = config.OURA_API_BASE
+        self.chat_id = chat_id
 
     def _headers(self) -> dict[str, str]:
-        token = get_valid_token("oura")
+        token = get_valid_token(self.chat_id, "oura")
         if not token:
             raise OuraAuthError("No valid Oura token. Run /connect_oura first.")
         return {"Authorization": f"Bearer {token}"}

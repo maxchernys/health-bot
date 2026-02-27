@@ -18,35 +18,25 @@ import config
 from auth.flask_server import get_auth_url, get_valid_token
 from aggregator.aggregator import aggregate
 from bot.assistant import ask_health_assistant, morning_briefing, evening_summary
+from database.db import ensure_user
 from utils.formatting import format_health_summary
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Auth guard
-# ---------------------------------------------------------------------------
-
-def _only_owner(func):
-    """Decorator: reject messages not from the configured CHAT_ID."""
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.id != config.TELEGRAM_CHAT_ID:
-            await update.message.reply_text("⛔ Unauthorized.")
-            return
-        return await func(update, context)
-    return wrapper
-
-
-# ---------------------------------------------------------------------------
 # Command handlers
 # ---------------------------------------------------------------------------
 
-@_only_owner
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
     text = (
         "👋 *Health Bot*\n\n"
         "Commands:\n"
         "  /health — full health summary\n"
+        "  /morning — morning briefing\n"
+        "  /evening — evening summary\n"
         "  /connect\\_whoop — authorize Whoop\n"
         "  /connect\\_oura — authorize Oura\n"
         "  /status — connection status\n\n"
@@ -55,11 +45,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 
-@_only_owner
 async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
     msg = await update.message.reply_text("⏳ Fetching health data…")
     try:
-        data = aggregate()
+        data = aggregate(chat_id)
         text = format_health_summary(data)
         await msg.edit_text(text, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
@@ -67,9 +58,10 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await msg.edit_text(f"❌ Error: {e}")
 
 
-@_only_owner
 async def cmd_connect_whoop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    url = get_auth_url("whoop")
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
+    url = get_auth_url(chat_id, "whoop")
     await update.message.reply_text(
         f"🔗 [Connect Whoop]({url})\n\nOpen the link, authorize, then come back.",
         parse_mode=ParseMode.MARKDOWN,
@@ -77,9 +69,10 @@ async def cmd_connect_whoop(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
 
-@_only_owner
 async def cmd_connect_oura(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    url = get_auth_url("oura")
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
+    url = get_auth_url(chat_id, "oura")
     await update.message.reply_text(
         f"🔗 [Connect Oura Ring]({url})\n\nOpen the link, authorize, then come back.",
         parse_mode=ParseMode.MARKDOWN,
@@ -87,32 +80,35 @@ async def cmd_connect_oura(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
-@_only_owner
 async def cmd_morning(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
     msg = await update.message.reply_text("☀️ Генерирую утренний брифинг…")
     try:
-        text = morning_briefing()
+        text = morning_briefing(chat_id)
         await msg.edit_text(text)
     except Exception as e:
         logger.exception("[Bot] /morning error")
         await msg.edit_text(f"❌ Ошибка: {e}")
 
 
-@_only_owner
 async def cmd_evening(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
     msg = await update.message.reply_text("🌙 Генерирую вечернее саммари…")
     try:
-        text = evening_summary()
+        text = evening_summary(chat_id)
         await msg.edit_text(text)
     except Exception as e:
         logger.exception("[Bot] /evening error")
         await msg.edit_text(f"❌ Ошибка: {e}")
 
 
-@_only_owner
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    whoop_ok = get_valid_token("whoop") is not None
-    oura_ok = get_valid_token("oura") is not None
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
+    whoop_ok = get_valid_token(chat_id, "whoop") is not None
+    oura_ok = get_valid_token(chat_id, "oura") is not None
     whoop_str = "✅ connected" if whoop_ok else "❌ not connected — /connect\\_whoop"
     oura_str = "✅ connected" if oura_ok else "❌ not connected — /connect\\_oura"
     lines = [
@@ -127,12 +123,13 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 # Text message handler — health assistant
 # ---------------------------------------------------------------------------
 
-@_only_owner
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
     question = update.message.text
     msg = await update.message.reply_text("🤔 Анализирую…")
     try:
-        answer = ask_health_assistant(question)
+        answer = ask_health_assistant(chat_id, question)
         await msg.edit_text(answer)
     except Exception as e:
         logger.exception("[Bot] handle_message error")
