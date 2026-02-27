@@ -7,7 +7,7 @@ import anthropic
 
 import config
 from aggregator.aggregator import aggregate
-from database.db import db
+from database.db import db, save_message, get_recent_messages
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,12 @@ What you can do:
 - Notice trends over 7-14 days and proactively mention them
 - Warn about signs of overtraining or approaching illness based on combined signals
 - Learn about the user through conversation: their sport, training schedule, goals, lifestyle — and use this context in future responses
+
+Conversation memory:
+- You have access to the full conversation history with this user.
+- Use it to remember what the user told you: their sport, training schedule, goals, injuries, lifestyle habits, preferences.
+- If the user mentioned something relevant before — use it without asking again.
+- Build a mental model of the user over time and personalize your advice accordingly.
 
 Rules:
 - Never give generic health advice that ignores the actual data
@@ -171,20 +177,29 @@ def _build_health_context_with_history(chat_id: int, data: dict) -> str:
     return context
 
 
-def ask_health_assistant(chat_id: int, question: str) -> str:
+def ask_health_assistant(chat_id: int, question: str, *, save: bool = True) -> str:
     """Fetch current health data and answer user's question with Claude."""
     try:
         data = aggregate(chat_id)
         context = _build_health_context_with_history(chat_id, data)
         system = SYSTEM_PROMPT.format(health_context=context)
 
-        message = _client.messages.create(
+        history = get_recent_messages(chat_id)
+        messages = history + [{"role": "user", "content": question}]
+
+        response = _client.messages.create(
             model=config.CLAUDE_MODEL,
             max_tokens=1024,
             system=system,
-            messages=[{"role": "user", "content": question}],
+            messages=messages,
         )
-        return message.content[0].text
+        answer = response.content[0].text
+
+        if save:
+            save_message(chat_id, "user", question)
+            save_message(chat_id, "assistant", answer)
+
+        return answer
     except Exception as e:
         logger.exception("[Assistant] Error")
         return f"Ошибка при обработке вопроса: {e}"
@@ -192,19 +207,23 @@ def ask_health_assistant(chat_id: int, question: str) -> str:
 
 def morning_briefing(chat_id: int) -> str:
     """Generate a morning health briefing via Claude."""
-    return ask_health_assistant(
-        chat_id,
+    prompt = (
         "Дай утренний брифинг. Кратко расскажи как я спал, как восстановился, "
         "и что лучше делать сегодня — тренироваться или отдыхать. "
-        "Если есть что-то необычное в данных — обрати внимание.",
+        "Если есть что-то необычное в данных — обрати внимание."
     )
+    answer = ask_health_assistant(chat_id, prompt, save=False)
+    save_message(chat_id, "assistant", f"[Утренний брифинг]\n{answer}")
+    return answer
 
 
 def evening_summary(chat_id: int) -> str:
     """Generate an evening day summary via Claude."""
-    return ask_health_assistant(
-        chat_id,
+    prompt = (
         "Дай вечернее саммари за день. Расскажи как прошёл день по данным: "
         "сколько шагов, какой был strain/нагрузка, уровень стресса, активность. "
-        "Дай рекомендацию на вечер — когда лучше лечь спать для хорошего восстановления.",
+        "Дай рекомендацию на вечер — когда лучше лечь спать для хорошего восстановления."
     )
+    answer = ask_health_assistant(chat_id, prompt, save=False)
+    save_message(chat_id, "assistant", f"[Вечернее саммари]\n{answer}")
+    return answer

@@ -107,6 +107,17 @@ def init_db() -> None:
                 UNIQUE(chat_id, date)
             );
 
+            -- Conversation history (per user)
+            CREATE TABLE IF NOT EXISTS messages (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id    INTEGER NOT NULL,
+                role       TEXT NOT NULL,
+                content    TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_messages_chat
+                ON messages(chat_id, created_at);
+
         """)
     print(f"[DB] Initialized at {DATABASE_PATH}")
 
@@ -124,3 +135,23 @@ def get_all_users() -> list[int]:
     with db() as conn:
         rows = conn.execute("SELECT chat_id FROM users").fetchall()
     return [r["chat_id"] for r in rows]
+
+
+def save_message(chat_id: int, role: str, content: str) -> None:
+    """Store a conversation message."""
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
+            (chat_id, role, content),
+        )
+
+
+def get_recent_messages(chat_id: int, limit: int = 50) -> list[dict]:
+    """Return last N messages for a user, oldest first."""
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT role, content FROM messages "
+            "WHERE chat_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (chat_id, limit),
+        ).fetchall()
+    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
