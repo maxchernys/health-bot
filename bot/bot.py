@@ -17,7 +17,7 @@ from telegram.constants import ParseMode
 import config
 from auth.flask_server import get_auth_url, get_valid_token
 from aggregator.aggregator import aggregate
-from bot.assistant import ask_health_assistant
+from bot.assistant import ask_health_assistant, morning_briefing, evening_summary
 from utils.formatting import format_health_summary
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,28 @@ async def cmd_connect_oura(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 @_only_owner
+async def cmd_morning(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = await update.message.reply_text("☀️ Генерирую утренний брифинг…")
+    try:
+        text = morning_briefing()
+        await msg.edit_text(text)
+    except Exception as e:
+        logger.exception("[Bot] /morning error")
+        await msg.edit_text(f"❌ Ошибка: {e}")
+
+
+@_only_owner
+async def cmd_evening(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = await update.message.reply_text("🌙 Генерирую вечернее саммари…")
+    try:
+        text = evening_summary()
+        await msg.edit_text(text)
+    except Exception as e:
+        logger.exception("[Bot] /evening error")
+        await msg.edit_text(f"❌ Ошибка: {e}")
+
+
+@_only_owner
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     whoop_ok = get_valid_token("whoop") is not None
     oura_ok = get_valid_token("oura") is not None
@@ -126,6 +148,8 @@ def build_application() -> Application:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("health", cmd_health))
+    app.add_handler(CommandHandler("morning", cmd_morning))
+    app.add_handler(CommandHandler("evening", cmd_evening))
     app.add_handler(CommandHandler("connect_whoop", cmd_connect_whoop))
     app.add_handler(CommandHandler("connect_oura", cmd_connect_oura))
     app.add_handler(CommandHandler("status", cmd_status))
