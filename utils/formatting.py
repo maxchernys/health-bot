@@ -122,7 +122,7 @@ def format_health_summary(data: dict) -> str:
 
     # --- Whoop Workout ---
     w_strain = w.get("workout_strain")
-    if w_strain:
+    if w_strain and w_strain >= 1.0:
         lines.append(f"\n*Whoop — Workout*")
         lines.append(f"  Strain:     `{w_strain:.1f}`")
         lines.append(f"  Sport:      `{w.get('workout_sport', '—')}`")
