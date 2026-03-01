@@ -171,6 +171,11 @@ def format_health_summary(data: dict) -> str:
         else "  Activity:   —"
     )
     lines.append(f"  Steps:      `{o_steps:,}`" if o_steps else "  Steps:      —")
+    o_total_cal = o.get("total_calories")
+    o_active_cal = o.get("active_calories")
+    if o_total_cal:
+        bmr = o_total_cal - (o_active_cal or 0)
+        lines.append(f"  Calories:   `{o_total_cal:,}` total / `{o_active_cal or 0:,}` active / `{bmr:,}` BMR")
     lines.append(
         f"  Stress hrs: `{o_stress:.1f}h`" if o_stress is not None else "  Stress hrs: —"
     )

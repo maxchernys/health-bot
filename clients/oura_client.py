@@ -132,6 +132,7 @@ class OuraClient:
             "activity_score": activity.get("score"),
             "activity_contributors": activity.get("contributors"),
             "steps": activity.get("steps"),
+            "total_calories": activity.get("total_calories"),
             "active_calories": activity.get("active_calories"),
             # Stress (API returns seconds, convert to hours)
             "stress_high": round(stress.get("stress_high", 0) / 3600, 1) if stress.get("stress_high") is not None else None,

@@ -183,6 +183,13 @@ def _build_health_context(data: dict) -> str:
     lines.append(f"Sleep Score: {o.get('sleep_score', '—')}/100")
     lines.append(f"Activity Score: {o.get('activity_score', '—')}/100")
     lines.append(f"Steps: {o.get('steps', '—')}")
+    o_total_cal = o.get("total_calories")
+    o_active_cal = o.get("active_calories")
+    if o_total_cal:
+        bmr = o_total_cal - (o_active_cal or 0)
+        lines.append(f"Calories: {o_total_cal} total / {o_active_cal or 0} active / {bmr} BMR")
+    else:
+        lines.append("Calories: —")
     lines.append(f"Stress (high hours): {o.get('stress_high', '—')}h")
     lines.append(f"Recovery (high hours): {o.get('recovery_high', '—')}h")
     lines.append(f"Temperature Deviation: {o.get('temperature_deviation', '—')}°C")
