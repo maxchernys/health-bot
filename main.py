@@ -7,7 +7,6 @@ import logging
 from database.db import init_db
 from auth.flask_server import create_flask_app
 from bot.bot import run_bot
-from bot.scheduler import start_scheduler
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -31,10 +30,7 @@ async def main():
     flask_thread.start()
     logger.info("OAuth callback server started on :%s", os.getenv("PORT", 8080))
 
-    # 3. Start APScheduler (morning summaries)
-    start_scheduler()
-
-    # 4. Run Telegram bot (blocking)
+    # 3. Run Telegram bot (blocking)
     logger.info("Starting Telegram bot…")
     await run_bot()
 

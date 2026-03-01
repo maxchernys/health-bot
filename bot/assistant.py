@@ -205,25 +205,3 @@ def ask_health_assistant(chat_id: int, question: str, *, save: bool = True) -> s
         return f"Ошибка при обработке вопроса: {e}"
 
 
-def morning_briefing(chat_id: int) -> str:
-    """Generate a morning health briefing via Claude."""
-    prompt = (
-        "Дай утренний брифинг. Кратко расскажи как я спал, как восстановился, "
-        "и что лучше делать сегодня — тренироваться или отдыхать. "
-        "Если есть что-то необычное в данных — обрати внимание."
-    )
-    answer = ask_health_assistant(chat_id, prompt, save=False)
-    save_message(chat_id, "assistant", f"[Утренний брифинг]\n{answer}")
-    return answer
-
-
-def evening_summary(chat_id: int) -> str:
-    """Generate an evening day summary via Claude."""
-    prompt = (
-        "Дай вечернее саммари за день. Расскажи как прошёл день по данным: "
-        "сколько шагов, какой был strain/нагрузка, уровень стресса, активность. "
-        "Дай рекомендацию на вечер — когда лучше лечь спать для хорошего восстановления."
-    )
-    answer = ask_health_assistant(chat_id, prompt, save=False)
-    save_message(chat_id, "assistant", f"[Вечернее саммари]\n{answer}")
-    return answer

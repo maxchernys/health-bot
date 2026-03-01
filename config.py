@@ -35,11 +35,3 @@ CLAUDE_MODEL = "claude-opus-4-6"
 # --- Database ---
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "./data/health.db"))
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-# --- Scheduler (all times in UTC; user is UTC+2) ---
-MORNING_SUMMARY_HOUR = 6       # 08:00 UTC+2
-MORNING_SUMMARY_MINUTE = 0
-EVENING_REMINDER_HOUR = 19     # 21:00 UTC+2
-EVENING_REMINDER_MINUTE = 0
-EVENING_SUMMARY_HOUR = 19      # 21:30 UTC+2
-EVENING_SUMMARY_MINUTE = 30

@@ -17,7 +17,7 @@ from telegram.constants import ParseMode
 import config
 from auth.flask_server import get_auth_url, get_valid_token
 from aggregator.aggregator import aggregate
-from bot.assistant import ask_health_assistant, morning_briefing, evening_summary
+from bot.assistant import ask_health_assistant
 from database.db import ensure_user
 from utils.formatting import format_health_summary
 
@@ -35,8 +35,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "👋 *Health Bot*\n\n"
         "Commands:\n"
         "  /health — full health summary\n"
-        "  /morning — morning briefing\n"
-        "  /evening — evening summary\n"
         "  /connect\\_whoop — authorize Whoop\n"
         "  /connect\\_oura — authorize Oura\n"
         "  /status — connection status\n\n"
@@ -80,30 +78,6 @@ async def cmd_connect_oura(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
-async def cmd_morning(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    ensure_user(chat_id)
-    msg = await update.message.reply_text("☀️ Генерирую утренний брифинг…")
-    try:
-        text = morning_briefing(chat_id)
-        await msg.edit_text(text)
-    except Exception as e:
-        logger.exception("[Bot] /morning error")
-        await msg.edit_text(f"❌ Ошибка: {e}")
-
-
-async def cmd_evening(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    ensure_user(chat_id)
-    msg = await update.message.reply_text("🌙 Генерирую вечернее саммари…")
-    try:
-        text = evening_summary(chat_id)
-        await msg.edit_text(text)
-    except Exception as e:
-        logger.exception("[Bot] /evening error")
-        await msg.edit_text(f"❌ Ошибка: {e}")
-
-
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     ensure_user(chat_id)
@@ -145,8 +119,6 @@ def build_application() -> Application:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("health", cmd_health))
-    app.add_handler(CommandHandler("morning", cmd_morning))
-    app.add_handler(CommandHandler("evening", cmd_evening))
     app.add_handler(CommandHandler("connect_whoop", cmd_connect_whoop))
     app.add_handler(CommandHandler("connect_oura", cmd_connect_oura))
     app.add_handler(CommandHandler("status", cmd_status))
