@@ -26,8 +26,8 @@ Your personality:
 - Always communicate in Russian. Use "ты" form.
 
 Your data sources:
-- Whoop: recovery score, HRV, RHR, strain, sleep performance
-- Oura: readiness score, deep/REM sleep stages, body temperature deviation, SpO2, stress level
+- Whoop: recovery score, HRV, RHR, daily strain, workout strain/sport/HR zones, sleep performance, calories burned
+- Oura: readiness score, deep/REM sleep stages, body temperature deviation, SpO2, stress level, resilience, VO2 max, workouts, optimal bedtime
 
 How to use the data:
 - Always ground your answers in actual numbers. Don't give generic advice.
@@ -71,6 +71,7 @@ def _get_history(chat_id: int, days: int = 7) -> str:
                    d.composite_recovery, d.training_readiness,
                    w.recovery_score, w.hrv_rmssd, w.rhr, w.sleep_duration_min,
                    w.sleep_efficiency, w.workout_strain,
+                   w.day_strain, w.day_calories_kcal,
                    o.readiness_score, o.sleep_score, o.activity_score,
                    o.stress_high, o.temperature_deviation
             FROM daily_scores d
@@ -96,14 +97,17 @@ def _get_history(chat_id: int, days: int = 7) -> str:
             sleep = f"{h}h{m}m"
         else:
             sleep = "—"
-        strain = f"{r['workout_strain']:.1f}" if r["workout_strain"] else "—"
+        day_strain = f"{r['day_strain']:.1f}" if r["day_strain"] else "—"
+        w_strain = f"{r['workout_strain']:.1f}" if r["workout_strain"] else "—"
+        cal = f"{r['day_calories_kcal']:.0f}" if r["day_calories_kcal"] else "—"
         stress = f"{r['stress_high']:.1f}h" if r["stress_high"] else "—"
         temp = f"{r['temperature_deviation']:+.2f}" if r["temperature_deviation"] is not None else "—"
 
         lines.append(
             f"  {r['date']}: recovery={r['composite_recovery'] or '—'}, "
             f"HRV={hrv}, RHR={rhr}, sleep={sleep}, "
-            f"strain={strain}, stress={stress}, temp_dev={temp}"
+            f"day_strain={day_strain}, workout={w_strain}, cal={cal}, "
+            f"stress={stress}, temp_dev={temp}"
         )
 
     return "\n".join(lines)
@@ -146,8 +150,33 @@ def _build_health_context(data: dict) -> str:
     lines.append(f"Respiratory Rate: {w.get('respiratory_rate', '—')}/min")
     lines.append(f"Disturbances: {w.get('disturbance_count', '—')}")
 
-    lines.append(f"\n--- Whoop Strain ---")
+    lines.append(f"\n--- Whoop Daily Strain ---")
+    lines.append(f"Day Strain: {w.get('day_strain', '—')}")
+    day_cal = w.get("day_calories_kcal")
+    lines.append(f"Day Calories: {day_cal} kcal" if day_cal else "Day Calories: —")
+    lines.append(f"Day Avg HR: {w.get('day_avg_hr', '—')} bpm")
+    lines.append(f"Day Max HR: {w.get('day_max_hr', '—')} bpm")
+
+    lines.append(f"\n--- Whoop Workout ---")
     lines.append(f"Workout Strain: {w.get('workout_strain', '—')}")
+    lines.append(f"Sport: {w.get('workout_sport', '—')}")
+    lines.append(f"Avg HR: {w.get('workout_avg_hr', '—')} bpm")
+    lines.append(f"Max HR: {w.get('workout_max_hr', '—')} bpm")
+    wcal = w.get("workout_calories_kcal")
+    lines.append(f"Calories: {wcal} kcal" if wcal else "Calories: —")
+    wdist = w.get("workout_distance_m")
+    if wdist:
+        lines.append(f"Distance: {wdist:.0f} m")
+    walt = w.get("workout_altitude_m")
+    if walt:
+        lines.append(f"Altitude Gain: {walt:.0f} m")
+    zones = []
+    for i in range(6):
+        z = w.get(f"workout_zone_{i}_min")
+        if z:
+            zones.append(f"Z{i}={z:.1f}m")
+    if zones:
+        lines.append(f"HR Zones: {', '.join(zones)}")
 
     lines.append("\n--- Oura Ring ---")
     lines.append(f"Readiness Score: {o.get('readiness_score', '—')}/100")
@@ -158,6 +187,28 @@ def _build_health_context(data: dict) -> str:
     lines.append(f"Recovery (high hours): {o.get('recovery_high', '—')}h")
     lines.append(f"Temperature Deviation: {o.get('temperature_deviation', '—')}°C")
     lines.append(f"SpO2 avg: {o.get('spo2_avg', '—')}%")
+    lines.append(f"Resilience: {o.get('resilience_level', '—')}")
+    vo2 = o.get("vo2_max")
+    lines.append(f"VO2 Max: {vo2}" if vo2 else "VO2 Max: —")
+
+    oura_wtype = o.get("oura_workout_type")
+    if oura_wtype:
+        lines.append(f"\n--- Oura Workout ---")
+        lines.append(f"Type: {oura_wtype}")
+        lines.append(f"Intensity: {o.get('oura_workout_intensity', '—')}")
+        ocal = o.get("oura_workout_calories")
+        lines.append(f"Calories: {ocal} kcal" if ocal else "Calories: —")
+        odist = o.get("oura_workout_distance_m")
+        if odist:
+            lines.append(f"Distance: {odist:.0f} m")
+        lines.append(f"Avg HR: {o.get('oura_workout_avg_hr', '—')} bpm")
+        lines.append(f"Max HR: {o.get('oura_workout_max_hr', '—')} bpm")
+
+    bed_start = o.get("optimal_bedtime_start")
+    if bed_start:
+        lines.append(f"\n--- Optimal Bedtime ---")
+        lines.append(f"Window: {bed_start} – {o.get('optimal_bedtime_end', '—')}")
+        lines.append(f"Status: {o.get('optimal_bedtime_status', '—')}")
 
     errors = data.get("errors", [])
     if errors:

@@ -67,6 +67,22 @@ def init_db() -> None:
                 sleep_duration_min REAL,
                 sleep_efficiency REAL,
                 workout_strain  REAL,
+                day_strain      REAL,
+                day_calories_kcal REAL,
+                day_avg_hr      REAL,
+                day_max_hr      REAL,
+                workout_sport   TEXT,
+                workout_avg_hr  REAL,
+                workout_max_hr  REAL,
+                workout_calories_kcal REAL,
+                workout_distance_m REAL,
+                workout_altitude_m REAL,
+                workout_zone_0_min REAL,
+                workout_zone_1_min REAL,
+                workout_zone_2_min REAL,
+                workout_zone_3_min REAL,
+                workout_zone_4_min REAL,
+                workout_zone_5_min REAL,
                 raw_json        TEXT,
                 created_at      INTEGER DEFAULT (strftime('%s', 'now')),
                 UNIQUE(chat_id, date)
@@ -88,6 +104,18 @@ def init_db() -> None:
                 day_summary     TEXT,
                 temperature_deviation REAL,
                 temperature_trend_deviation REAL,
+                resilience_level TEXT,
+                resilience_contributors TEXT,
+                vo2_max         REAL,
+                oura_workout_type TEXT,
+                oura_workout_calories REAL,
+                oura_workout_distance_m REAL,
+                oura_workout_intensity TEXT,
+                oura_workout_avg_hr REAL,
+                oura_workout_max_hr REAL,
+                optimal_bedtime_start TEXT,
+                optimal_bedtime_end TEXT,
+                optimal_bedtime_status TEXT,
                 raw_json        TEXT,
                 created_at      INTEGER DEFAULT (strftime('%s', 'now')),
                 UNIQUE(chat_id, date)
@@ -119,7 +147,42 @@ def init_db() -> None:
                 ON messages(chat_id, created_at);
 
         """)
+    _migrate_db()
     print(f"[DB] Initialized at {DATABASE_PATH}")
+
+
+def _migrate_db() -> None:
+    """Add new columns to existing tables (idempotent)."""
+    whoop_cols = [
+        ("day_strain", "REAL"), ("day_calories_kcal", "REAL"),
+        ("day_avg_hr", "REAL"), ("day_max_hr", "REAL"),
+        ("workout_sport", "TEXT"), ("workout_avg_hr", "REAL"),
+        ("workout_max_hr", "REAL"), ("workout_calories_kcal", "REAL"),
+        ("workout_distance_m", "REAL"), ("workout_altitude_m", "REAL"),
+        ("workout_zone_0_min", "REAL"), ("workout_zone_1_min", "REAL"),
+        ("workout_zone_2_min", "REAL"), ("workout_zone_3_min", "REAL"),
+        ("workout_zone_4_min", "REAL"), ("workout_zone_5_min", "REAL"),
+    ]
+    oura_cols = [
+        ("resilience_level", "TEXT"), ("resilience_contributors", "TEXT"),
+        ("vo2_max", "REAL"),
+        ("oura_workout_type", "TEXT"), ("oura_workout_calories", "REAL"),
+        ("oura_workout_distance_m", "REAL"), ("oura_workout_intensity", "TEXT"),
+        ("oura_workout_avg_hr", "REAL"), ("oura_workout_max_hr", "REAL"),
+        ("optimal_bedtime_start", "TEXT"), ("optimal_bedtime_end", "TEXT"),
+        ("optimal_bedtime_status", "TEXT"),
+    ]
+    with db() as conn:
+        for col, typ in whoop_cols:
+            try:
+                conn.execute(f"ALTER TABLE whoop_metrics ADD COLUMN {col} {typ}")
+            except Exception:
+                pass
+        for col, typ in oura_cols:
+            try:
+                conn.execute(f"ALTER TABLE oura_metrics ADD COLUMN {col} {typ}")
+            except Exception:
+                pass
 
 
 def ensure_user(chat_id: int) -> None:

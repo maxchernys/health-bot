@@ -1,4 +1,4 @@
-"""Oura Ring API v2 client — fetches readiness, sleep, activity, stress, temperature."""
+"""Oura Ring API v2 client — fetches readiness, sleep, activity, stress, resilience, VO2 max, workouts, bedtime."""
 from __future__ import annotations
 
 import logging
@@ -75,6 +75,35 @@ class OuraClient:
     def get_spo2(self) -> dict | None:
         return self._fetch_today("/daily_spo2")
 
+    def get_resilience(self) -> dict | None:
+        return self._fetch_today("/daily_resilience")
+
+    def get_vo2_max(self) -> dict | None:
+        return self._fetch_today("/vo2_max", fallback_days=7)
+
+    def get_workout(self) -> dict | None:
+        """Get the most recent workout for today."""
+        today = self._today()
+        try:
+            data = self._get("/workout", params={"start_date": today, "end_date": today})
+            items = data.get("data", [])
+            return items[-1] if items else None
+        except Exception as e:
+            logger.error("[Oura] /workout failed: %s", e)
+            return None
+
+    def get_sleep_time(self) -> dict | None:
+        return self._fetch_today("/sleep_time")
+
+    @staticmethod
+    def _offset_to_time(offset: int | None) -> str | None:
+        """Convert seconds-from-midnight offset to HH:MM string."""
+        if offset is None:
+            return None
+        h, remainder = divmod(abs(offset), 3600)
+        m = remainder // 60
+        return f"{h:02d}:{m:02d}"
+
     # ------------------------------------------------------------------
     # Convenience: all metrics
     # ------------------------------------------------------------------
@@ -84,6 +113,10 @@ class OuraClient:
         activity = self.get_activity() or {}
         stress = self.get_stress() or {}
         spo2 = self.get_spo2() or {}
+        resilience = self.get_resilience() or {}
+        vo2 = self.get_vo2_max() or {}
+        workout = self.get_workout() or {}
+        sleep_time = self.get_sleep_time() or {}
 
         spo2_pct = spo2.get("spo2_percentage", {}) or {}
 
@@ -109,6 +142,22 @@ class OuraClient:
             "temperature_trend_deviation": readiness.get("temperature_trend_deviation"),
             # SpO2
             "spo2_avg": spo2_pct.get("average"),
+            # Resilience
+            "resilience_level": resilience.get("level"),
+            "resilience_contributors": resilience.get("contributors"),
+            # VO2 Max
+            "vo2_max": vo2.get("vo2_max"),
+            # Workout
+            "oura_workout_type": workout.get("activity"),
+            "oura_workout_calories": workout.get("calories"),
+            "oura_workout_distance_m": workout.get("distance"),
+            "oura_workout_intensity": workout.get("intensity"),
+            "oura_workout_avg_hr": workout.get("average_heart_rate"),
+            "oura_workout_max_hr": workout.get("max_heart_rate"),
+            # Optimal bedtime
+            "optimal_bedtime_start": self._offset_to_time(sleep_time.get("recommendation", {}).get("optimal_bedtime", {}).get("start_offset")),
+            "optimal_bedtime_end": self._offset_to_time(sleep_time.get("recommendation", {}).get("optimal_bedtime", {}).get("end_offset")),
+            "optimal_bedtime_status": sleep_time.get("recommendation", {}).get("status"),
         }
 
         result["_raw"] = {
@@ -117,6 +166,10 @@ class OuraClient:
             "activity": activity,
             "stress": stress,
             "spo2": spo2,
+            "resilience": resilience,
+            "vo2_max": vo2,
+            "workout": workout,
+            "sleep_time": sleep_time,
         }
 
         return result

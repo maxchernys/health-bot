@@ -108,11 +108,43 @@ def format_health_summary(data: dict) -> str:
     dist = w.get("disturbance_count")
     lines.append(f"  Disturb.:   `{dist}`" if dist is not None else "  Disturb.:   —")
 
-    # --- Whoop Strain ---
-    strain = w.get("workout_strain")
-    if strain:
-        lines.append(f"\n*Whoop — Strain*")
-        lines.append(f"  Workout:    `{strain:.1f}`")
+    # --- Whoop Daily Strain ---
+    day_strain = w.get("day_strain")
+    if day_strain:
+        lines.append(f"\n*Whoop — Daily*")
+        lines.append(f"  Day Strain: `{day_strain:.1f}`")
+        day_cal = w.get("day_calories_kcal")
+        lines.append(f"  Calories:   `{day_cal:.0f} kcal`" if day_cal else "  Calories:   —")
+        day_avg = w.get("day_avg_hr")
+        lines.append(f"  Avg HR:     `{day_avg:.0f} bpm`" if day_avg else "  Avg HR:     —")
+        day_max = w.get("day_max_hr")
+        lines.append(f"  Max HR:     `{day_max:.0f} bpm`" if day_max else "  Max HR:     —")
+
+    # --- Whoop Workout ---
+    w_strain = w.get("workout_strain")
+    if w_strain:
+        lines.append(f"\n*Whoop — Workout*")
+        lines.append(f"  Strain:     `{w_strain:.1f}`")
+        lines.append(f"  Sport:      `{w.get('workout_sport', '—')}`")
+        w_avg = w.get("workout_avg_hr")
+        lines.append(f"  Avg HR:     `{w_avg:.0f} bpm`" if w_avg else "  Avg HR:     —")
+        w_max = w.get("workout_max_hr")
+        lines.append(f"  Max HR:     `{w_max:.0f} bpm`" if w_max else "  Max HR:     —")
+        wcal = w.get("workout_calories_kcal")
+        lines.append(f"  Calories:   `{wcal:.0f} kcal`" if wcal else "  Calories:   —")
+        wdist = w.get("workout_distance_m")
+        if wdist:
+            lines.append(f"  Distance:   `{wdist:.0f} m`")
+        walt = w.get("workout_altitude_m")
+        if walt:
+            lines.append(f"  Altitude:   `{walt:.0f} m`")
+        zones = []
+        for i in range(6):
+            z = w.get(f"workout_zone_{i}_min")
+            if z:
+                zones.append(f"Z{i}:`{z:.0f}m`")
+        if zones:
+            lines.append(f"  HR Zones:   {' '.join(zones)}")
 
     # --- Oura ---
     lines.append("\n*Oura*")
@@ -149,6 +181,36 @@ def format_health_summary(data: dict) -> str:
     lines.append(
         f"  SpO₂ avg:   `{o_spo2:.1f}%`" if o_spo2 is not None else "  SpO₂ avg:   —"
     )
+    o_resil = o.get("resilience_level")
+    lines.append(f"  Resilience: `{o_resil}`" if o_resil else "  Resilience: —")
+    o_vo2 = o.get("vo2_max")
+    lines.append(f"  VO₂ Max:    `{o_vo2:.1f}`" if o_vo2 else "  VO₂ Max:    —")
+
+    # --- Oura Workout ---
+    o_wtype = o.get("oura_workout_type")
+    if o_wtype:
+        lines.append(f"\n*Oura — Workout*")
+        lines.append(f"  Type:       `{o_wtype}`")
+        o_wint = o.get("oura_workout_intensity")
+        lines.append(f"  Intensity:  `{o_wint}`" if o_wint else "  Intensity:  —")
+        o_wcal = o.get("oura_workout_calories")
+        lines.append(f"  Calories:   `{o_wcal:.0f} kcal`" if o_wcal else "  Calories:   —")
+        o_wdist = o.get("oura_workout_distance_m")
+        if o_wdist:
+            lines.append(f"  Distance:   `{o_wdist:.0f} m`")
+        o_wavg = o.get("oura_workout_avg_hr")
+        lines.append(f"  Avg HR:     `{o_wavg:.0f} bpm`" if o_wavg else "  Avg HR:     —")
+        o_wmax = o.get("oura_workout_max_hr")
+        lines.append(f"  Max HR:     `{o_wmax:.0f} bpm`" if o_wmax else "  Max HR:     —")
+
+    # --- Optimal Bedtime ---
+    bed_start = o.get("optimal_bedtime_start")
+    if bed_start:
+        bed_end = o.get("optimal_bedtime_end", "—")
+        bed_status = o.get("optimal_bedtime_status", "—")
+        lines.append(f"\n*Optimal Bedtime*")
+        lines.append(f"  Window:     `{bed_start} – {bed_end}`")
+        lines.append(f"  Status:     `{bed_status}`")
 
     if errors:
         lines.append("\n⚠️ *Partial data:*")
