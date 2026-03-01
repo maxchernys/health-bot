@@ -80,11 +80,14 @@ class WhoopClient:
         return self._latest("/activity/sleep")
 
     def get_workout(self) -> dict | None:
-        start, end = self._today_window()
+        """Get the most recent workout for today only."""
+        now = datetime.now(timezone.utc)
+        start = now.strftime("%Y-%m-%dT00:00:00.000Z")
+        end = now.strftime("%Y-%m-%dT23:59:59.999Z")
         try:
-            data = self._get("/activity/workout", params={"start": start, "end": end, "limit": 1})
+            data = self._get("/activity/workout", params={"start": start, "end": end})
             records = data.get("records", [])
-            return records[0] if records else None
+            return records[-1] if records else None
         except Exception as e:
             logger.error("[Whoop] /activity/workout failed: %s", e)
             return None
