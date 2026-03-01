@@ -35,6 +35,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "👋 *Health Bot*\n\n"
         "Commands:\n"
         "  /health — full health summary\n"
+        "  /calories — калории за сегодня\n"
         "  /connect\\_whoop — authorize Whoop\n"
         "  /connect\\_oura — authorize Oura\n"
         "  /status — connection status\n\n"
@@ -76,6 +77,41 @@ async def cmd_connect_oura(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
     )
+
+
+async def cmd_calories(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    ensure_user(chat_id)
+    msg = await update.message.reply_text("⏳ Считаю калории…")
+    try:
+        data = aggregate(chat_id)
+        w = data.get("whoop", {})
+        o = data.get("oura", {})
+        lines = [f"🔥 *Калории за сегодня*\n"]
+
+        # Whoop
+        w_cal = w.get("day_calories_kcal")
+        w_workout_cal = w.get("workout_calories_kcal")
+        lines.append("*Whoop*")
+        lines.append(f"  За день:    `{w_cal:.0f} kcal`" if w_cal else "  За день:    —")
+        lines.append(f"  Тренировка: `{w_workout_cal:.0f} kcal`" if w_workout_cal else "  Тренировка: —")
+
+        # Oura
+        o_total = o.get("total_calories")
+        o_active = o.get("active_calories")
+        lines.append("\n*Oura*")
+        if o_total:
+            bmr = o_total - (o_active or 0)
+            lines.append(f"  За день:    `{o_total:,} kcal`")
+            lines.append(f"  Активные:   `{o_active or 0:,} kcal`")
+            lines.append(f"  BMR:        `{bmr:,} kcal`")
+        else:
+            lines.append("  За день:    —")
+
+        await msg.edit_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.exception("[Bot] /calories error")
+        await msg.edit_text(f"❌ Error: {e}")
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -121,6 +157,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("connect_whoop", cmd_connect_whoop))
     app.add_handler(CommandHandler("connect_oura", cmd_connect_oura))
+    app.add_handler(CommandHandler("calories", cmd_calories))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
