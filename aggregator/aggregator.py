@@ -122,6 +122,7 @@ def aggregate(chat_id: int) -> dict:
 def _save_whoop(chat_id: int, today: str, w: dict) -> None:
     raw = json.dumps(w.get("_raw", {}))
     with db() as conn:
+        conn.execute("DELETE FROM whoop_metrics WHERE chat_id = ? AND date = ?", (chat_id, today))
         conn.execute(
             """
             INSERT INTO whoop_metrics
@@ -134,33 +135,6 @@ def _save_whoop(chat_id: int, today: str, w: dict) -> None:
                  workout_zone_3_min, workout_zone_4_min, workout_zone_5_min,
                  raw_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(chat_id, date) DO UPDATE SET
-                recovery_score      = excluded.recovery_score,
-                hrv_rmssd           = excluded.hrv_rmssd,
-                rhr                 = excluded.rhr,
-                spo2                = excluded.spo2,
-                skin_temp_c         = excluded.skin_temp_c,
-                sleep_score         = excluded.sleep_score,
-                sleep_duration_min  = excluded.sleep_duration_min,
-                sleep_efficiency    = excluded.sleep_efficiency,
-                workout_strain      = excluded.workout_strain,
-                day_strain          = excluded.day_strain,
-                day_calories_kcal   = excluded.day_calories_kcal,
-                day_avg_hr          = excluded.day_avg_hr,
-                day_max_hr          = excluded.day_max_hr,
-                workout_sport       = excluded.workout_sport,
-                workout_avg_hr      = excluded.workout_avg_hr,
-                workout_max_hr      = excluded.workout_max_hr,
-                workout_calories_kcal = excluded.workout_calories_kcal,
-                workout_distance_m  = excluded.workout_distance_m,
-                workout_altitude_m  = excluded.workout_altitude_m,
-                workout_zone_0_min  = excluded.workout_zone_0_min,
-                workout_zone_1_min  = excluded.workout_zone_1_min,
-                workout_zone_2_min  = excluded.workout_zone_2_min,
-                workout_zone_3_min  = excluded.workout_zone_3_min,
-                workout_zone_4_min  = excluded.workout_zone_4_min,
-                workout_zone_5_min  = excluded.workout_zone_5_min,
-                raw_json            = excluded.raw_json
             """,
             (
                 chat_id, today,
@@ -198,6 +172,7 @@ def _save_whoop(chat_id: int, today: str, w: dict) -> None:
 def _save_oura(chat_id: int, today: str, o: dict) -> None:
     raw = json.dumps(o.get("_raw", {}))
     with db() as conn:
+        conn.execute("DELETE FROM oura_metrics WHERE chat_id = ? AND date = ?", (chat_id, today))
         conn.execute(
             """
             INSERT INTO oura_metrics
@@ -211,33 +186,6 @@ def _save_oura(chat_id: int, today: str, o: dict) -> None:
                  steps, spo2_avg,
                  raw_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(chat_id, date) DO UPDATE SET
-                readiness_score              = excluded.readiness_score,
-                readiness_contributors       = excluded.readiness_contributors,
-                sleep_score                  = excluded.sleep_score,
-                sleep_contributors           = excluded.sleep_contributors,
-                activity_score               = excluded.activity_score,
-                activity_contributors        = excluded.activity_contributors,
-                stress_high                  = excluded.stress_high,
-                recovery_high                = excluded.recovery_high,
-                day_summary                  = excluded.day_summary,
-                temperature_deviation        = excluded.temperature_deviation,
-                temperature_trend_deviation  = excluded.temperature_trend_deviation,
-                resilience_level             = excluded.resilience_level,
-                resilience_contributors      = excluded.resilience_contributors,
-                vo2_max                      = excluded.vo2_max,
-                oura_workout_type            = excluded.oura_workout_type,
-                oura_workout_calories        = excluded.oura_workout_calories,
-                oura_workout_distance_m      = excluded.oura_workout_distance_m,
-                oura_workout_intensity       = excluded.oura_workout_intensity,
-                oura_workout_avg_hr          = excluded.oura_workout_avg_hr,
-                oura_workout_max_hr          = excluded.oura_workout_max_hr,
-                optimal_bedtime_start        = excluded.optimal_bedtime_start,
-                optimal_bedtime_end          = excluded.optimal_bedtime_end,
-                optimal_bedtime_status       = excluded.optimal_bedtime_status,
-                steps                        = excluded.steps,
-                spo2_avg                     = excluded.spo2_avg,
-                raw_json                     = excluded.raw_json
             """,
             (
                 chat_id, today,
@@ -274,13 +222,11 @@ def _save_oura(chat_id: int, today: str, o: dict) -> None:
 
 def _save_daily_scores(chat_id: int, today: str, composite: float | None, training: float | None) -> None:
     with db() as conn:
+        conn.execute("DELETE FROM daily_scores WHERE chat_id = ? AND date = ?", (chat_id, today))
         conn.execute(
             """
             INSERT INTO daily_scores (chat_id, date, composite_recovery, training_readiness)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT(chat_id, date) DO UPDATE SET
-                composite_recovery = excluded.composite_recovery,
-                training_readiness = excluded.training_readiness
             """,
             (chat_id, today, composite, training),
         )

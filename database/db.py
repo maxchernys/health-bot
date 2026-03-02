@@ -153,6 +153,8 @@ def init_db() -> None:
     print(f"[DB] Initialized at {DATABASE_PATH}")
 
 
+
+
 def _add_column(conn, table: str, col: str, typ: str) -> None:
     """Add a column to a table if it doesn't exist (idempotent)."""
     try:
@@ -216,16 +218,6 @@ def _migrate_db() -> None:
         for col, typ in oura_cols:
             _add_column(conn, "oura_metrics", col, typ)
 
-        # --- Ensure UNIQUE(chat_id, date) exists for ON CONFLICT ---
-        # Old tables may only have UNIQUE(date) without chat_id
-        for table in ("whoop_metrics", "oura_metrics", "daily_scores"):
-            try:
-                conn.execute(
-                    f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{table}_chat_date "
-                    f"ON {table}(chat_id, date)"
-                )
-            except Exception:
-                pass
 
 
 def ensure_user(chat_id: int) -> None:
