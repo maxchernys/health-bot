@@ -32,6 +32,16 @@ OAUTH_REDIRECT_URI_OURA = f"{OAUTH_REDIRECT_HOST}/callback/oura"
 ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
 CLAUDE_MODEL = "claude-opus-4-6"
 
+# --- API (dev fallback for Telegram initData auth) ---
+TELEGRAM_CHAT_ID: int = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
+
+# --- CORS ---
+CORS_ORIGINS: list[str] = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "https://mealcheck.kolupaev.tech,http://localhost:5173").split(",")
+    if o.strip()
+]
+
 # --- Database ---
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", "./data/health.db"))
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)

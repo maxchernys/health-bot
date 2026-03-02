@@ -208,8 +208,9 @@ def _save_oura(chat_id: int, today: str, o: dict) -> None:
                  oura_workout_type, oura_workout_calories, oura_workout_distance_m,
                  oura_workout_intensity, oura_workout_avg_hr, oura_workout_max_hr,
                  optimal_bedtime_start, optimal_bedtime_end, optimal_bedtime_status,
+                 steps, spo2_avg,
                  raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(chat_id, date) DO UPDATE SET
                 readiness_score              = excluded.readiness_score,
                 readiness_contributors       = excluded.readiness_contributors,
@@ -234,6 +235,8 @@ def _save_oura(chat_id: int, today: str, o: dict) -> None:
                 optimal_bedtime_start        = excluded.optimal_bedtime_start,
                 optimal_bedtime_end          = excluded.optimal_bedtime_end,
                 optimal_bedtime_status       = excluded.optimal_bedtime_status,
+                steps                        = excluded.steps,
+                spo2_avg                     = excluded.spo2_avg,
                 raw_json                     = excluded.raw_json
             """,
             (
@@ -261,6 +264,8 @@ def _save_oura(chat_id: int, today: str, o: dict) -> None:
                 o.get("optimal_bedtime_start"),
                 o.get("optimal_bedtime_end"),
                 o.get("optimal_bedtime_status"),
+                o.get("steps"),
+                _safe(o.get("spo2_avg")),
                 raw,
             ),
         )

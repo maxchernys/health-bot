@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sqlite3
 from contextlib import contextmanager
 from config import DATABASE_PATH
@@ -151,38 +153,68 @@ def init_db() -> None:
     print(f"[DB] Initialized at {DATABASE_PATH}")
 
 
+def _add_column(conn, table: str, col: str, typ: str) -> None:
+    """Add a column to a table if it doesn't exist (idempotent)."""
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+    except Exception:
+        pass
+
+
 def _migrate_db() -> None:
     """Add new columns to existing tables (idempotent)."""
-    whoop_cols = [
-        ("day_strain", "REAL"), ("day_calories_kcal", "REAL"),
-        ("day_avg_hr", "REAL"), ("day_max_hr", "REAL"),
-        ("workout_sport", "TEXT"), ("workout_avg_hr", "REAL"),
-        ("workout_max_hr", "REAL"), ("workout_calories_kcal", "REAL"),
-        ("workout_distance_m", "REAL"), ("workout_altitude_m", "REAL"),
-        ("workout_zone_0_min", "REAL"), ("workout_zone_1_min", "REAL"),
-        ("workout_zone_2_min", "REAL"), ("workout_zone_3_min", "REAL"),
-        ("workout_zone_4_min", "REAL"), ("workout_zone_5_min", "REAL"),
-    ]
-    oura_cols = [
-        ("resilience_level", "TEXT"), ("resilience_contributors", "TEXT"),
-        ("vo2_max", "REAL"),
-        ("oura_workout_type", "TEXT"), ("oura_workout_calories", "REAL"),
-        ("oura_workout_distance_m", "REAL"), ("oura_workout_intensity", "TEXT"),
-        ("oura_workout_avg_hr", "REAL"), ("oura_workout_max_hr", "REAL"),
-        ("optimal_bedtime_start", "TEXT"), ("optimal_bedtime_end", "TEXT"),
-        ("optimal_bedtime_status", "TEXT"),
-    ]
+    import config as _cfg
+
     with db() as conn:
+        # --- chat_id migration (single-user → multi-user) ---
+        for table in ("oauth_tokens", "whoop_metrics", "oura_metrics", "daily_scores"):
+            _add_column(conn, table, "chat_id", "INTEGER")
+
+        # Backfill chat_id for existing rows
+        default_cid = _cfg.TELEGRAM_CHAT_ID
+        if default_cid:
+            for table in ("oauth_tokens", "whoop_metrics", "oura_metrics", "daily_scores"):
+                conn.execute(
+                    f"UPDATE {table} SET chat_id = ? WHERE chat_id IS NULL",
+                    (default_cid,),
+                )
+
+        # --- Oura: add missing data columns ---
+        oura_new_cols = [
+            ("steps", "INTEGER"),
+            ("spo2_avg", "REAL"),
+            ("total_calories", "INTEGER"),
+            ("active_calories", "INTEGER"),
+        ]
+        for col, typ in oura_new_cols:
+            _add_column(conn, "oura_metrics", col, typ)
+
+        # --- Whoop: add extended columns ---
+        whoop_cols = [
+            ("day_strain", "REAL"), ("day_calories_kcal", "REAL"),
+            ("day_avg_hr", "REAL"), ("day_max_hr", "REAL"),
+            ("workout_sport", "TEXT"), ("workout_avg_hr", "REAL"),
+            ("workout_max_hr", "REAL"), ("workout_calories_kcal", "REAL"),
+            ("workout_distance_m", "REAL"), ("workout_altitude_m", "REAL"),
+            ("workout_zone_0_min", "REAL"), ("workout_zone_1_min", "REAL"),
+            ("workout_zone_2_min", "REAL"), ("workout_zone_3_min", "REAL"),
+            ("workout_zone_4_min", "REAL"), ("workout_zone_5_min", "REAL"),
+        ]
         for col, typ in whoop_cols:
-            try:
-                conn.execute(f"ALTER TABLE whoop_metrics ADD COLUMN {col} {typ}")
-            except Exception:
-                pass
+            _add_column(conn, "whoop_metrics", col, typ)
+
+        # --- Oura: add extended columns ---
+        oura_cols = [
+            ("resilience_level", "TEXT"), ("resilience_contributors", "TEXT"),
+            ("vo2_max", "REAL"),
+            ("oura_workout_type", "TEXT"), ("oura_workout_calories", "REAL"),
+            ("oura_workout_distance_m", "REAL"), ("oura_workout_intensity", "TEXT"),
+            ("oura_workout_avg_hr", "REAL"), ("oura_workout_max_hr", "REAL"),
+            ("optimal_bedtime_start", "TEXT"), ("optimal_bedtime_end", "TEXT"),
+            ("optimal_bedtime_status", "TEXT"),
+        ]
         for col, typ in oura_cols:
-            try:
-                conn.execute(f"ALTER TABLE oura_metrics ADD COLUMN {col} {typ}")
-            except Exception:
-                pass
+            _add_column(conn, "oura_metrics", col, typ)
 
 
 def ensure_user(chat_id: int) -> None:
@@ -213,8 +245,90 @@ def get_recent_messages(chat_id: int, limit: int = 50) -> list[dict]:
     """Return last N messages for a user, oldest first."""
     with db() as conn:
         rows = conn.execute(
-            "SELECT role, content FROM messages "
+            "SELECT role, content, created_at FROM messages "
             "WHERE chat_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
             (chat_id, limit),
         ).fetchall()
-    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
+    return [
+        {
+            "role": r["role"],
+            "content": r["content"],
+            "created_at": _unix_to_iso(r["created_at"]),
+        }
+        for r in reversed(rows)
+    ]
+
+
+def _unix_to_iso(ts: int | None) -> str | None:
+    """Convert unix timestamp to ISO 8601 string."""
+    if ts is None:
+        return None
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def get_connection_status(chat_id: int) -> dict:
+    """Return connection status for WHOOP and Oura."""
+    result = {
+        "whoop": {"connected": False},
+        "oura": {"connected": False},
+    }
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT provider, expires_at FROM oauth_tokens WHERE chat_id = ?",
+            (chat_id,),
+        ).fetchall()
+    for r in rows:
+        provider = r["provider"]
+        if provider in result:
+            result[provider] = {
+                "connected": True,
+                "expires_at": _unix_to_iso(r["expires_at"]),
+            }
+    return result
+
+
+def delete_oauth_token(chat_id: int, provider: str) -> None:
+    """Delete OAuth token for a provider."""
+    with db() as conn:
+        conn.execute(
+            "DELETE FROM oauth_tokens WHERE chat_id = ? AND provider = ?",
+            (chat_id, provider),
+        )
+
+
+def get_health_history(chat_id: int, days: int = 7) -> list[dict]:
+    """Return health history for the last N days, oldest first."""
+    with db() as conn:
+        rows = conn.execute(
+            """
+            SELECT d.date,
+                   d.composite_recovery,
+                   d.training_readiness,
+                   w.hrv_rmssd  AS hrv,
+                   w.rhr,
+                   w.sleep_duration_min,
+                   o.steps,
+                   w.workout_strain AS strain
+            FROM daily_scores d
+            LEFT JOIN whoop_metrics w ON w.chat_id = d.chat_id AND w.date = d.date
+            LEFT JOIN oura_metrics  o ON o.chat_id = d.chat_id AND o.date = d.date
+            WHERE d.chat_id = ?
+            ORDER BY d.date DESC
+            LIMIT ?
+            """,
+            (chat_id, days),
+        ).fetchall()
+    return [
+        {
+            "date": r["date"],
+            "composite_recovery": r["composite_recovery"],
+            "training_readiness": r["training_readiness"],
+            "hrv": r["hrv"],
+            "rhr": r["rhr"],
+            "sleep_duration_min": r["sleep_duration_min"],
+            "steps": r["steps"],
+            "strain": r["strain"],
+        }
+        for r in reversed(rows)
+    ]
