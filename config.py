@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+load_dotenv(override=False)
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN: str = os.environ["TELEGRAM_BOT_TOKEN"]
