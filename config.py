@@ -24,7 +24,7 @@ OURA_API_BASE = "https://api.ouraring.com/v2/usercollection"
 OURA_SCOPES = "daily email personal heartrate workout tag session spo2"
 
 # --- OAuth callback ---
-OAUTH_REDIRECT_HOST: str = os.getenv("OAUTH_REDIRECT_HOST", "http://localhost:8080")
+OAUTH_REDIRECT_HOST: str = os.environ["OAUTH_REDIRECT_HOST"]
 OAUTH_REDIRECT_URI_WHOOP = f"{OAUTH_REDIRECT_HOST}/callback/whoop"
 OAUTH_REDIRECT_URI_OURA = f"{OAUTH_REDIRECT_HOST}/callback/oura"
 
@@ -38,7 +38,7 @@ TELEGRAM_CHAT_ID: int = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
 # --- CORS ---
 CORS_ORIGINS: list[str] = [
     o.strip()
-    for o in os.getenv("CORS_ORIGINS", "https://mealcheck.kolupaev.tech,http://localhost:5173").split(",")
+    for o in os.getenv("CORS_ORIGINS", "https://mealcheck.kolupaev.tech").split(",")
     if o.strip()
 ]
 
