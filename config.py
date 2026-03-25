@@ -32,6 +32,10 @@ OAUTH_REDIRECT_URI_OURA = f"{OAUTH_REDIRECT_HOST}/callback/oura"
 ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
 CLAUDE_MODEL = "claude-opus-4-6"
 
+# --- Apple Sign In (iOS) ---
+APPLE_BUNDLE_ID: str = os.getenv("APPLE_BUNDLE_ID", "cherny.aura")
+JWT_SECRET: str = os.getenv("JWT_SECRET", os.urandom(32).hex())
+
 # --- API (dev fallback for Telegram initData auth) ---
 TELEGRAM_CHAT_ID: int = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
 

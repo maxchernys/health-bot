@@ -17,6 +17,9 @@ APScheduler==3.10.4
 # Claude Vision for nutrition
 anthropic==0.45.0
 
+# JWT for iOS Sign in with Apple
+PyJWT[crypto]==2.9.0
+
 # Async HTTP (used by python-telegram-bot internally)
 aiohttp==3.11.11
 aiofiles==24.1.0

@@ -1,4 +1,10 @@
-"""Auth middleware — extracts chat_id from Telegram initData bearer token."""
+"""Auth middleware — extracts chat_id from bearer token.
+
+Supports three token types:
+1. Dev token:  starts with "testik_pestik" → config.TELEGRAM_CHAT_ID
+2. JWT token:  issued by /api/auth/apple → decode to get chat_id
+3. Telegram initData:  URL-encoded query string → parse user.id
+"""
 from __future__ import annotations
 
 import json
@@ -13,11 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_chat_id_from_request() -> int | None:
-    """Extract chat_id from the Authorization header.
-
-    Dev mode:  token starts with "testik_pestik" → config.TELEGRAM_CHAT_ID
-    Prod mode: token is URL-encoded Telegram WebApp initData → parse user.id
-    """
+    """Extract chat_id from the Authorization header."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None
@@ -26,12 +28,21 @@ def get_chat_id_from_request() -> int | None:
     if not token:
         return None
 
-    # Dev fallback
+    # 1. Dev fallback
     if token.startswith("testik_pestik"):
         return config.TELEGRAM_CHAT_ID
 
-    # Production: parse Telegram initData query string
-    # Format: "query_id=...&user={"id":123456,...}&auth_date=...&hash=..."
+    # 2. JWT token (from iOS Sign in with Apple)
+    if token.count(".") == 2:  # JWT has 3 parts separated by dots
+        try:
+            from auth.apple_auth import decode_jwt
+            payload = decode_jwt(token)
+            if payload and "chat_id" in payload:
+                return int(payload["chat_id"])
+        except Exception as e:
+            logger.warning("[Auth] JWT decode failed: %s", e)
+
+    # 3. Telegram initData query string
     try:
         parsed = urllib.parse.parse_qs(token)
         user_json = parsed.get("user", [""])[0]

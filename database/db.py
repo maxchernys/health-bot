@@ -55,6 +55,16 @@ def init_db() -> None:
                 created_at  INTEGER DEFAULT (strftime('%s', 'now'))
             );
 
+            -- Apple Sign In users (iOS app)
+            CREATE TABLE IF NOT EXISTS apple_users (
+                apple_user_id TEXT PRIMARY KEY,
+                chat_id       INTEGER NOT NULL,
+                email         TEXT,
+                created_at    INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_apple_chat
+                ON apple_users(chat_id);
+
             -- Whoop daily snapshots (per user)
             CREATE TABLE IF NOT EXISTS whoop_metrics (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,

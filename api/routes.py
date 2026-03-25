@@ -17,9 +17,35 @@ from database.db import (
     get_recent_messages,
 )
 
+from auth.apple_auth import handle_apple_signin
+
 logger = logging.getLogger(__name__)
 
 health_api = Blueprint("health_api", __name__, url_prefix="/api/health")
+
+# ─── Auth ───────────────────────────────────────────────────────────
+
+auth_api = Blueprint("auth_api", __name__, url_prefix="/api/auth")
+
+
+@auth_api.route("/apple", methods=["POST"])
+def apple_signin():
+    """Sign in with Apple — verify identity token, return JWT."""
+    body = request.get_json(silent=True) or {}
+    identity_token = body.get("identity_token", "").strip()
+
+    if not identity_token:
+        return jsonify({"error": "identity_token is required"}), 400
+
+    try:
+        result = handle_apple_signin(identity_token)
+        return jsonify(result)
+    except ValueError as e:
+        logger.warning("[Auth] Apple sign-in failed: %s", e)
+        return jsonify({"error": str(e)}), 401
+    except Exception as e:
+        logger.exception("[Auth] Apple sign-in error")
+        return jsonify({"error": "Authentication failed"}), 500
 
 
 @health_api.route("/connections", methods=["GET"])
